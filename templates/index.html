@@ -18,7 +18,7 @@
 
     <main>
       <section class="form-card">
-        <form action="/predict" method="POST">
+        <form id="predictForm">
           <div class="form-grid">
             <div class="form-group">
               <label for="Temperature">Temperature (°C)</label>
@@ -61,10 +61,43 @@
           <button type="submit">Predict Fire Risk</button>
         </form>
 
-        {% if prediction_text %}
-        <div class="result-box">{{ prediction_text }}</div>
-        {% endif %}
+        <div id="resultBox" class="result-box"></div>
       </section>
     </main>
+
+    <script>
+      const form = document.getElementById("predictForm");
+      const resultBox = document.getElementById("resultBox");
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        try {
+          const response = await fetch("/predict", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          // ✅ Read values from Flask response
+          const value = data.prediction;
+          const risk = data.risk_level;
+
+          // ✅ Color styling based on risk
+          let colorClass = "";
+          if (risk === "Low Risk") colorClass = "low";
+          else if (risk === "Medium Risk") colorClass = "medium";
+          else if (risk === "High Risk") colorClass = "high";
+
+          resultBox.className = `result-box ${colorClass}`;
+          resultBox.innerHTML = `<h2>${value}</h2><p>${risk}</p>`;
+        } catch (err) {
+          resultBox.innerHTML = "Error fetching prediction.";
+        }
+      });
+    </script>
   </body>
 </html>

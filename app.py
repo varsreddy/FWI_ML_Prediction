@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import numpy as np
 import pickle
 import os
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -23,6 +24,9 @@ except Exception as e:
     model = None
     scaler = None
 
+# ---------- Define Input Order ----------
+input_features = ["Temperature", "RH", "Ws", "Rain", "FFMC", "DMC", "DC", "ISI", "BUI"]
+
 # ---------- Home Page ----------
 @app.route('/')
 def home():
@@ -33,26 +37,35 @@ def home():
 def predict():
     try:
         if model is None or scaler is None:
-            return render_template('index.html', prediction_text="Error: Model not loaded")
+            return jsonify({'prediction': 'Error: Model not loaded'})
 
-        # Collect input safely
-        data = []
-        for key in request.form:
+        # Collect form data
+        data_dict = {}
+        for feature in input_features:
+            value = request.form.get(feature)
             try:
-                data.append(float(request.form[key]))
-            except ValueError:
-                data.append(0)  # default if input is missing or invalid
+                data_dict[feature] = float(value)
+            except (ValueError, TypeError):
+                data_dict[feature] = 0
 
-        # Scale and predict
-        scaled_input = scaler.transform([data])
+        # Convert to DataFrame
+        input_df = pd.DataFrame([data_dict])
+        scaled_input = scaler.transform(input_df)
         prediction = model.predict(scaled_input)[0]
 
+        # Determine risk category
+        if prediction < 20:
+            risk = "Low Risk"
+        elif prediction < 40:
+            risk = "Medium Risk"
+        else:
+            risk = "High Risk"
+
         result_text = f"🔥 Predicted Fire Risk Index: {prediction:.2f}"
-        return render_template('index.html', prediction_text=result_text)
+        return jsonify({'prediction': result_text, 'risk_level': risk})
 
     except Exception as e:
-        print(f"⚠️ Prediction Error: {e}")
-        return render_template('index.html', prediction_text=f"Error: {str(e)}")
+        return jsonify({'prediction': f"Error: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(debug=True)
